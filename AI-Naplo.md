@@ -9,3 +9,5 @@ A CRUD eljárásokat AI-jal csináltuk, de észrevettük nem csinálta meg az ö
 Backend:
 
 Elsőként az adatokat nem tudta, amikor összekapcsoltam kodal a mysql-t és a Backendet, de késöbb oda adtam neki és sikerült.
+
+Ha tesztet kérünk, mert nem vagyunk benne biztosak, akkor bele írja a kodban. Ezért késöbb meg kértem törölje ki a tesztet.
