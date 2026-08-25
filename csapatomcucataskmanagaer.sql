@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Gép: 127.0.0.1
--- Létrehozás ideje: 2026. Aug 24. 11:46
+-- Létrehozás ideje: 2026. Aug 25. 13:05
 -- Kiszolgáló verziója: 10.4.32-MariaDB
 -- PHP verzió: 8.2.12
 
@@ -71,6 +71,10 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_get_tags_for_task` (IN `p_task_i
     FROM tags t
     JOIN task_tags tt ON t.id = tt.tag_id
     WHERE tt.task_id = p_task_id;
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_get_tasks_by_user` (IN `p_user_id` INT)   BEGIN
+    SELECT * FROM tasks WHERE user_id = p_user_id ORDER BY created_at DESC;
 END$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_get_task_by_id` (IN `p_id` INT)   BEGIN
