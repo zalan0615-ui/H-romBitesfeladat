@@ -33,6 +33,17 @@
             font-size: 14px;
             box-sizing: border-box;
         }
+        /* Egyedi stílus a keresőmezőnek */
+        .search-bar {
+            margin-top: 25px;
+            padding-top: 15px;
+            border-top: 2px solid #f0f0f0;
+        }
+        .search-bar input {
+            background-color: #fdfdfd;
+            border: 1px solid #007bff;
+            margin-bottom: 0;
+        }
         button {
             background: #007bff;
             color: white;
@@ -50,7 +61,7 @@
         button.danger:hover { background: #c82333; }
         button.edit { background: #ffc107; color: black; }
         button.edit:hover { background: #e0a800; }
-        ul { list-style-type: none; padding: 0; margin-top: 20px; }
+        ul { list-style-type: none; padding: 0; margin-top: 15px; }
         li {
             display: flex;
             justify-content: space-between;
@@ -76,7 +87,6 @@
             border-bottom: 1px solid #eee;
             padding-bottom: 10px;
         }
-        /* Módosítás Modal stílusok */
         .modal {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -124,6 +134,11 @@
                     <option value="DONE">Kész</option>
                 </select>
                 <button class="add-btn" onclick="addTask()">Feladat mentése adatbázisba</button>
+            </div>
+
+            <!-- Új keresőmező szekció -->
+            <div class="search-bar">
+                <input type="text" id="search-input" placeholder="🔍 Keresés a feladatok között neve alapján..." oninput="renderTasks()">
             </div>
 
             <ul id="task-list"></ul>
