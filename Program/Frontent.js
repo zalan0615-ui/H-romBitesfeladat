@@ -31,7 +31,7 @@ async function login() {
 
         // Ha még nem létezik a user az adatbázisban, létrehozzuk
         if (!user) {
-            const createRes = await fetch(`${API_URL}/users`, {
+            await fetch(`${API_URL}/users`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -40,8 +40,16 @@ async function login() {
                     password: 'defaultPassword'
                 })
             });
-            const newUserRes = await createRes.json();
-            user = { id: newUserRes.insertId || newUserRes.id, username: usernameInput };
+
+            // Újra lekérjük a user listát, hogy a generált ID biztosan meglegyen
+            const updatedRes = await fetch(`${API_URL}/users`);
+            const updatedUsers = await updatedRes.json();
+            user = updatedUsers.find(u => u.username.toLowerCase() === usernameInput.toLowerCase());
+        }
+
+        if (!user || !user.id) {
+            alert('Hiba a felhasználó azonosításakor!');
+            return;
         }
 
         currentUser = user;
@@ -75,12 +83,14 @@ function showApp() {
 // --- FELADATOK KEZELÉSE ADATBÁZISSAL ---
 
 async function loadTasks() {
+    if (!currentUser || !currentUser.id) return;
+
     try {
         const response = await fetch(`${API_URL}/tasks`);
         const allTasks = await response.json();
         
-        // Szűrés a bejelentkezett felhasználó feladataira (megengedőbb típuskezeléssel)
-        tasks = allTasks.filter(t => t.user_id == currentUser.id);
+        // Szigorú szűrés user_id alapján (csak a bejelentkezett user saját feladatai)
+        tasks = allTasks.filter(t => t.user_id && Number(t.user_id) === Number(currentUser.id));
         renderTasks();
     } catch (error) {
         console.error('Hiba a feladatok betöltésekor:', error);
@@ -91,12 +101,26 @@ function renderTasks() {
     const taskList = document.getElementById('task-list');
     taskList.innerHTML = '';
 
-    if (tasks.length === 0) {
-        taskList.innerHTML = '<li style="justify-content: center; color: #888;">Nincs még elmentett feladatod.</li>';
+    // Keresőmező értékének lekérése és kisbetűssé alakítása a kereséshez
+    const searchInput = document.getElementById('search-input');
+    const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+    // Szűrjük a feladatokat a keresési kifejezés alapján a 'title' mezőben
+    const filteredTasks = tasks.filter(task => 
+        task.title.toLowerCase().includes(searchTerm)
+    );
+
+    if (filteredTasks.length === 0) {
+        // Ha van keresési kifejezés, de nincs találat, más üzenetet írunk ki
+        if (searchTerm !== '') {
+            taskList.innerHTML = '<li style="justify-content: center; color: #888;">Nincs a keresésnek megfelelő feladat.</li>';
+        } else {
+            taskList.innerHTML = '<li style="justify-content: center; color: #888;">Nincs még elmentett feladatod.</li>';
+        }
         return;
     }
 
-    tasks.forEach((task) => {
+    filteredTasks.forEach((task) => {
         const li = document.createElement('li');
 
         const infoDiv = document.createElement('div');
@@ -145,6 +169,11 @@ function renderTasks() {
 }
 
 async function addTask() {
+    if (!currentUser || !currentUser.id) {
+        alert('Nincs bejelentkezve felhasználó!');
+        return;
+    }
+
     const titleInput = document.getElementById('new-task-title');
     const descInput = document.getElementById('new-task-desc');
     const dateInput = document.getElementById('new-task-date');
