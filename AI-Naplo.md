@@ -14,7 +14,11 @@ Ha tesztet kérünk, mert nem vagyunk benne biztosak, akkor bele írja a kodban.
 
 Új fájlt írtam a tesztekhez, mert az AI-t össze zavarja. 
 
+Frontent:
 
+Az Ai elég sokáig nem akart semmi jót tenni, nem tudta össze kötni a backendel, de ez meg lett oldva, úgy, hogy létre hoztam egy "másik AI ablakot", hogy generáljak egy kinézeti Taskot és azt összeköttötem a Backendel.
+
+Ezután nem rakta be a taskokat és késöbb mondtam rakja be, hogy fizikailag is látsuk.
 
 
 

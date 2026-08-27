@@ -1,14 +1,14 @@
-// Globális változók
-let currentUser = null;
+const API_URL = 'http://localhost:3000/api'; // Az Express backend címe
+
+let currentUser = null; 
 let tasks = [];
 
-// Amikor betölt az oldal, ellenőrizzük, hogy be van-e lépve valaki
 window.onload = () => {
     const savedUser = localStorage.getItem('taskManagerUser');
     if (savedUser) {
-        currentUser = savedUser;
-        loadTasks();
+        currentUser = JSON.parse(savedUser);
         showApp();
+        loadTasks();
     } else {
         showLogin();
     }
@@ -16,25 +16,49 @@ window.onload = () => {
 
 // --- BEJELENTKEZÉS ÉS KIJELENTKEZÉS ---
 
-function login() {
+async function login() {
     const usernameInput = document.getElementById('username-input').value.trim();
-    if (usernameInput) {
-        currentUser = usernameInput;
-        localStorage.setItem('taskManagerUser', currentUser); // Felhasználó mentése
-        loadTasks();
-        showApp();
-    } else {
+    if (!usernameInput) {
         alert('Kérlek, adj meg egy felhasználónevet!');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/users`);
+        const users = await response.json();
+        
+        let user = users.find(u => u.username.toLowerCase() === usernameInput.toLowerCase());
+
+        // Ha még nem létezik a user az adatbázisban, létrehozzuk
+        if (!user) {
+            const createRes = await fetch(`${API_URL}/users`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: usernameInput,
+                    email: `${usernameInput}@example.com`,
+                    password: 'defaultPassword'
+                })
+            });
+            const newUserRes = await createRes.json();
+            user = { id: newUserRes.insertId || newUserRes.id, username: usernameInput };
+        }
+
+        currentUser = user;
+        localStorage.setItem('taskManagerUser', JSON.stringify(currentUser));
+        showApp();
+        loadTasks();
+    } catch (error) {
+        console.error('Hiba a bejelentkezésnél:', error);
+        alert('Nem sikerült csatlakozni az adatbázis backendhez!');
     }
 }
 
 function logout() {
     currentUser = null;
-    localStorage.removeItem('taskManagerUser'); // Felhasználó törlése a tárhelyről
+    localStorage.removeItem('taskManagerUser');
     showLogin();
 }
-
-// --- FELÜLET VÁLTÁSA ---
 
 function showLogin() {
     document.getElementById('login-section').classList.remove('hidden');
@@ -45,95 +69,169 @@ function showLogin() {
 function showApp() {
     document.getElementById('login-section').classList.add('hidden');
     document.getElementById('app-section').classList.remove('hidden');
-    document.getElementById('greeting').innerText = `Szia, ${currentUser}!`;
-    renderTasks();
+    document.getElementById('greeting').innerText = `Szia, ${currentUser.username}!`;
 }
 
-// --- FELADATOK KEZELÉSE ---
+// --- FELADATOK KEZELÉSE ADATBÁZISSAL ---
 
-// Feladatok betöltése a helyi tárhelyből (felhasználóspecifikus)
-function loadTasks() {
-    const savedTasks = localStorage.getItem(`tasks_${currentUser}`);
-    tasks = savedTasks ? JSON.parse(savedTasks) : [];
+async function loadTasks() {
+    try {
+        const response = await fetch(`${API_URL}/tasks`);
+        const allTasks = await response.json();
+        
+        // Szűrés a bejelentkezett felhasználó feladataira (megengedőbb típuskezeléssel)
+        tasks = allTasks.filter(t => t.user_id == currentUser.id);
+        renderTasks();
+    } catch (error) {
+        console.error('Hiba a feladatok betöltésekor:', error);
+    }
 }
 
-// Feladatok mentése a helyi tárhelyre
-function saveTasks() {
-    localStorage.setItem(`tasks_${currentUser}`, JSON.stringify(tasks));
-}
-
-// Feladatok megjelenítése a képernyőn
 function renderTasks() {
     const taskList = document.getElementById('task-list');
-    taskList.innerHTML = ''; // Lista ürítése újra-rajzolás előtt
+    taskList.innerHTML = '';
 
-    tasks.forEach((task, index) => {
+    if (tasks.length === 0) {
+        taskList.innerHTML = '<li style="justify-content: center; color: #888;">Nincs még elmentett feladatod.</li>';
+        return;
+    }
+
+    tasks.forEach((task) => {
         const li = document.createElement('li');
 
-        // Feladat szövege
-        const taskText = document.createElement('span');
-        taskText.innerText = task;
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'task-info';
 
-        // Gombok (Szerkesztés és Törlés) tárolója
+        const titleSpan = document.createElement('span');
+        titleSpan.className = 'task-title';
+        titleSpan.innerText = task.title;
+
+        const metaSpan = document.createElement('span');
+        metaSpan.className = 'task-meta';
+        
+        const formattedDate = task.due_date ? new Date(task.due_date).toLocaleDateString('hu-HU') : 'Nincs határidő';
+        
+        let statusText = task.status;
+        if (task.status === 'TODO') statusText = 'Elvégzendő';
+        if (task.status === 'IN_PROGRESS') statusText = 'Folyamatban';
+        if (task.status === 'DONE') statusText = 'Kész';
+
+        metaSpan.innerHTML = `<strong>[${statusText}]</strong> ${task.description || ''} <br><small>Határidő: ${formattedDate}</small>`;
+
+        infoDiv.appendChild(titleSpan);
+        infoDiv.appendChild(metaSpan);
+
         const actionsDiv = document.createElement('div');
         actionsDiv.className = 'task-actions';
 
-        // Szerkesztés gomb
         const editBtn = document.createElement('button');
         editBtn.innerText = 'Módosít';
         editBtn.className = 'edit';
-        editBtn.onclick = () => editTask(index);
+        editBtn.onclick = () => openEditModal(task);
 
-        // Törlés gomb
         const deleteBtn = document.createElement('button');
         deleteBtn.innerText = 'Töröl';
         deleteBtn.className = 'danger';
-        deleteBtn.onclick = () => deleteTask(index);
+        deleteBtn.onclick = () => deleteTask(task.id);
 
-        // Elemek összerakása
         actionsDiv.appendChild(editBtn);
         actionsDiv.appendChild(deleteBtn);
-        
-        li.appendChild(taskText);
+
+        li.appendChild(infoDiv);
         li.appendChild(actionsDiv);
-        
+
         taskList.appendChild(li);
     });
 }
 
-// Új feladat hozzáadása
-function addTask() {
-    const input = document.getElementById('new-task-input');
-    const newTask = input.value.trim();
-    
-    if (newTask) {
-        tasks.push(newTask); // Hozzáadás a tömbhöz
-        saveTasks();         // Mentés
-        input.value = '';    // Mező kiürítése
-        renderTasks();       // Lista frissítése
-    } else {
-        alert('A feladat nem lehet üres!');
+async function addTask() {
+    const titleInput = document.getElementById('new-task-title');
+    const descInput = document.getElementById('new-task-desc');
+    const dateInput = document.getElementById('new-task-date');
+    const statusSelect = document.getElementById('new-task-status');
+
+    const title = titleInput.value.trim();
+    if (!title) {
+        alert('A feladat címe kötelező!');
+        return;
+    }
+
+    try {
+        await fetch(`${API_URL}/tasks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title: title,
+                description: descInput.value.trim(),
+                status: statusSelect.value,
+                dueDate: dateInput.value || null,
+                userId: currentUser.id
+            })
+        });
+
+        titleInput.value = '';
+        descInput.value = '';
+        dateInput.value = '';
+        loadTasks();
+    } catch (error) {
+        console.error('Hiba a hozzáadáskor:', error);
     }
 }
 
-// Feladat módosítása
-function editTask(index) {
-    // Egy egyszerű felugró ablakot (prompt) használunk a módosításra
-    const updatedTask = prompt('Módosítsd a feladatot:', tasks[index]);
+// --- MÓDOSÍTÁS MODAL FUNKCIÓK ---
+
+function openEditModal(task) {
+    document.getElementById('edit-task-id').value = task.id;
+    document.getElementById('edit-task-title').value = task.title || '';
+    document.getElementById('edit-task-desc').value = task.description || '';
+    document.getElementById('edit-task-date').value = task.due_date ? task.due_date.split('T')[0] : '';
+    document.getElementById('edit-task-status').value = task.status || 'TODO';
     
-    // Ellenőrizzük, hogy nem nyomott-e Mégsem-et, és nem üres-e az új szöveg
-    if (updatedTask !== null && updatedTask.trim() !== '') {
-        tasks[index] = updatedTask.trim();
-        saveTasks();
-        renderTasks();
+    document.getElementById('edit-modal').classList.remove('hidden');
+}
+
+function closeEditModal() {
+    document.getElementById('edit-modal').classList.add('hidden');
+}
+
+async function saveTaskEdit() {
+    const id = document.getElementById('edit-task-id').value;
+    const title = document.getElementById('edit-task-title').value.trim();
+    const description = document.getElementById('edit-task-desc').value.trim();
+    const dueDate = document.getElementById('edit-task-date').value || null;
+    const status = document.getElementById('edit-task-status').value;
+
+    if (!title) {
+        alert('A feladat címe nem lehet üres!');
+        return;
+    }
+
+    try {
+        await fetch(`${API_URL}/tasks/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title: title,
+                description: description,
+                status: status,
+                dueDate: dueDate
+            })
+        });
+
+        closeEditModal();
+        loadTasks();
+    } catch (error) {
+        console.error('Hiba a módosításkor:', error);
     }
 }
 
-// Feladat törlése
-function deleteTask(index) {
-    if (confirm('Biztosan törölni szeretnéd ezt a feladatot?')) {
-        tasks.splice(index, 1); // Elem eltávolítása a tömbből
-        saveTasks();
-        renderTasks();
+async function deleteTask(id) {
+    if (!confirm('Biztosan törlöd ezt a feladatot az adatbázisból?')) return;
+
+    try {
+        await fetch(`${API_URL}/tasks/${id}`, { method: 'DELETE' });
+        loadTasks();
+    } catch (error) {
+        console.error('Hiba a törléskor:', error);
     }
 }
